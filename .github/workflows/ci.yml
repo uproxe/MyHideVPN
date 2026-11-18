@@ -50,26 +50,41 @@ jobs:
           path: dist/vless-setup.sh
 
   release:
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Релиз создаётся сам: при пуше в main, если релиза с версией из файла VERSION ещё нет,
+    # или при пуше тега vX.Y.Z. Чтобы выпустить новую версию — поменяйте число в VERSION.
+    if: github.event_name == 'push'
     needs: test
     runs-on: ubuntu-24.04
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
       - uses: actions/checkout@v6
 
-      - name: Версия в теге совпадает с файлом VERSION
+      - name: Версия и нужен ли релиз
+        id: v
         run: |
-          [ "v$(cat VERSION)" = "$GITHUB_REF_NAME" ] || { echo "тег $GITHUB_REF_NAME, а в VERSION $(cat VERSION)"; exit 1; }
+          TAG="v$(tr -d ' \r\n' < VERSION)"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_REF_NAME" != "$TAG" ]; then
+            echo "тег $GITHUB_REF_NAME, а в VERSION $TAG"; exit 1
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "релиз $TAG уже есть — пропускаю"; echo "need=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "need=1" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Сборка
+        if: steps.v.outputs.need == '1'
         run: |
           python3 tools/build.py
           cd dist && sha256sum vless-setup.sh > vless-setup.sh.sha256
 
       - name: Релиз с готовым файлом
-        env:
-          GH_TOKEN: ${{ github.token }}
+        if: steps.v.outputs.need == '1'
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/vless-setup.sh dist/vless-setup.sh.sha256 \
-            --title "$GITHUB_REF_NAME" --generate-notes
+          gh release create "${{ steps.v.outputs.tag }}" dist/vless-setup.sh dist/vless-setup.sh.sha256 \
+            --target "$GITHUB_SHA" --title "${{ steps.v.outputs.tag }}" --generate-notes
