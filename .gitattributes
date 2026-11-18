@@ -1,0 +1,4 @@
+# скрипты должны быть с переводами строк LF — иначе bash на сервере сломается
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf

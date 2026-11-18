@@ -1,0 +1,13 @@
+# сборка — публикуется через GitHub Releases, в репозиторий не коммитится
+dist/
+
+# личные данные, которые мастер пишет рядом с собой при запуске
+vless-setup.last
+vless-link.txt
+
+# мусор
+__pycache__/
+*.pyc
+*.bak
+*.swp
+.DS_Store
